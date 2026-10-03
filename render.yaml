@@ -1,0 +1,29 @@
+databases:
+  - name: icm-postgres
+    databaseName: icm_applications
+    user: icm_app
+    plan: free
+    region: ohio
+
+services:
+  - type: web
+    name: intercambio-cultural-mundial
+    runtime: node
+    plan: free
+    region: ohio
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: icm-postgres
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "false"
+      - key: NOTIFICATION_EMAIL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
