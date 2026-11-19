@@ -1,0 +1,22 @@
+name: Keep Render site awake
+
+on:
+  schedule:
+    # Avoid the busy top of the hour while pinging often enough to prevent idle sleep.
+    - cron: "2/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-render-site-awake
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Ping the site's health endpoint
+        run: curl --fail --silent --show-error --max-time 30 https://intercambio-cultural-mundial.onrender.com/api/health > /dev/null
