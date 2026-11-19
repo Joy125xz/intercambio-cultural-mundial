@@ -7,6 +7,7 @@ const { Resend } = require('resend');
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const notifyEmail = process.env.NOTIFICATION_EMAIL;
+let databaseReady = false;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined
@@ -54,7 +55,7 @@ async function initializeDatabase() {
   `);
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, database: databaseReady }));
 app.post('/api/applications', async (req, res) => {
   const body = req.body || {};
   const id = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.submissionId || '') ? body.submissionId : crypto.randomUUID();
@@ -71,6 +72,9 @@ app.post('/api/applications', async (req, res) => {
   };
   if (!application.name || !Number.isInteger(application.age) || application.age < 13 || application.age > 35 || !application.country || !application.interest || !application.consent || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(application.email)) {
     return res.status(400).json({ error: 'Revisa los campos obligatorios, la edad, el consentimiento y el correo electrónico.' });
+  }
+  if (!databaseReady) {
+    return res.status(503).json({ error: 'El formulario está temporalmente sin conexión. Inténtalo más tarde.' });
   }
   if (!notifyEmail || !process.env.RESEND_API_KEY || !process.env.FROM_EMAIL) {
     return res.status(503).json({ error: 'El servicio de correo todavía no está configurado.' });
@@ -114,10 +118,17 @@ app.post('/api/applications', async (req, res) => {
 
 app.use(express.static(__dirname, { extensions: ['html'] }));
 
-initializeDatabase().then(() => app.listen(port, () => console.log(`ICM server listening on ${port}`))).catch(error => {
-  console.error('Database initialization failed:', error.message);
-  process.exit(1);
+const server = app.listen(port, () => console.log(`ICM server listening on ${port}`));
+initializeDatabase().then(() => {
+  databaseReady = true;
+  console.log('ICM database ready');
+}).catch(error => {
+  console.error('Database initialization failed; website remains available:', error.message);
 });
 
-process.on('SIGTERM', async () => { await pool.end(); process.exit(0); });
+process.on('SIGTERM', async () => {
+  server.close();
+  await pool.end();
+  process.exit(0);
+});
 
