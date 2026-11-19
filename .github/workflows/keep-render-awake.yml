@@ -1,6 +1,9 @@
 name: Keep Render site awake
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     # Avoid the busy top of the hour while pinging often enough to prevent idle sleep.
     - cron: "2/5 * * * *"
